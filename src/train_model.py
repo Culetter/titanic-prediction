@@ -7,20 +7,27 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, roc_auc_score
 import matplotlib.pyplot as plt
 import joblib
+import os
 
 def load_data(path):
     df = pd.read_csv(path)
     df = df.drop(columns=['PassengerId', 'Name', 'Ticket', 'Cabin'])
     df['Age'] = df['Age'].fillna(df['Age'].mean())
     df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode()[0])
+    age_mean = df['Age'].mean()
 
     X = df.drop('Survived', axis=1)
     y = df['Survived']
 
-    return train_test_split(X, y, test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    return X_train, X_test, y_train, y_test, age_mean
 
 def train():
-    X_train, X_test, y_train, y_test = load_data('../data/train.csv')
+    os.makedirs('../results/graphs', exist_ok=True)
+    os.makedirs('../results/model', exist_ok=True)
+    os.makedirs('../results/prediction', exist_ok=True)
+
+    X_train, X_test, y_train, y_test, age_mean = load_data('../data/train.csv')
 
     numeric_features = ['Age', 'Fare', 'Pclass', 'SibSp', 'Parch']
     categorical_features = ['Sex', 'Embarked']
@@ -57,6 +64,21 @@ def train():
     plt.savefig('../results/graphs/ROC_Curve.jpg', format='jpg', dpi=300)
 
     joblib.dump(pipeline, '../results/model/model.joblib')
+
+    new_df = pd.read_csv('../data/test.csv')
+    passenger_ids = new_df['PassengerId']
+
+    new_df = new_df.drop(columns=['PassengerId', 'Name', 'Ticket', 'Cabin'])
+    new_df['Age'] = new_df['Age'].fillna(age_mean)
+    new_df['Fare'] = new_df['Fare'].fillna(new_df['Fare'].mean())
+
+    y_new_pred = pipeline.predict(new_df)
+
+    result = pd.DataFrame({
+        'PassengerId': passenger_ids,
+        'Survived': y_new_pred
+    })
+    result.to_csv('../results/prediction/prediction.csv', index=False)
 
 if __name__ == '__main__':
     train()
